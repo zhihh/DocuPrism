@@ -55,10 +55,20 @@ export interface DocumentProcessResult {
 class ApiService {
   private api: AxiosInstance;
   private baseURL: string;
+  private displayURL: string;
+
+  // API地址映射表 (显示地址 -> 实际地址)
+  private urlMappings: Record<string, string> = {
+    'https://zhihh.github.io/DocuPrism/api': 'https://docuprism.zhihh.xyz',
+    'https://docuprism.zhihh.xyz': 'https://docuprism.zhihh.xyz',
+    'http://8.137.111.189:50200': 'http://8.137.111.189:50200',
+    'http://localhost:8000': 'http://localhost:8000'
+  };
 
   constructor() {
     // 从环境变量或localStorage获取API地址
-    this.baseURL = this.getApiBaseUrl();
+    this.displayURL = this.getApiDisplayUrl();
+    this.baseURL = this.mapToRealUrl(this.displayURL);
     
     this.api = axios.create({
       baseURL: this.baseURL,
@@ -115,29 +125,51 @@ class ApiService {
     );
   }
 
-  private getApiBaseUrl(): string {
+  // 将显示地址映射为真实API地址
+  private mapToRealUrl(displayUrl: string): string {
+    return this.urlMappings[displayUrl] || displayUrl;
+  }
+
+  // 将真实地址映射为显示地址
+  private mapToDisplayUrl(realUrl: string): string {
+    for (const [display, real] of Object.entries(this.urlMappings)) {
+      if (real === realUrl) {
+        return display;
+      }
+    }
+    return realUrl;
+  }
+
+  private getApiDisplayUrl(): string {
     // 1. 检查localStorage中的配置
     const storedApiUrl = localStorage.getItem('apiBaseUrl');
     if (storedApiUrl && storedApiUrl !== 'default') {
       return storedApiUrl;
     }
 
-    // 2. 检查环境变量
+    // 2. 检查环境变量并映射为显示地址
     const envApiUrl = import.meta.env.VITE_API_BASE_URL;
     if (envApiUrl) {
-      return envApiUrl;
+      return this.mapToDisplayUrl(envApiUrl);
     }
 
-    // 3. 默认值 - 使用HTTPS生产服务器
-    return 'https://docuprism.zhihh.xyz';
+    // 3. 默认显示地址
+    return 'https://zhihh.github.io/DocuPrism/api';
   }
 
   // 动态更新API地址
-  updateBaseURL(newBaseURL: string) {
-    this.baseURL = newBaseURL;
-    this.api.defaults.baseURL = newBaseURL;
-    localStorage.setItem('apiBaseUrl', newBaseURL);
-    console.log(`API地址已更新为: ${newBaseURL}`);
+  updateBaseURL(newDisplayURL: string) {
+    this.displayURL = newDisplayURL;
+    this.baseURL = this.mapToRealUrl(newDisplayURL);
+    this.api.defaults.baseURL = this.baseURL;
+    localStorage.setItem('apiBaseUrl', newDisplayURL);
+    console.log(`显示API地址: ${newDisplayURL}`);
+    console.log(`实际API地址: ${this.baseURL}`);
+  }
+
+  // 获取显示用的API地址 (可以是伪装地址)
+  getDisplayURL(): string {
+    return this.displayURL;
   }
 
   getBaseURL(): string {

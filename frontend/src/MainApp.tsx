@@ -143,7 +143,7 @@ const App: React.FC = () => {
           {/* API配置 */}
           {showApiConfig && (
             <ApiConfig
-              currentUrl={apiService.getBaseURL()}
+              currentUrl={apiService.getDisplayURL()}
               onUrlChange={handleApiConfigChange}
               onClose={() => setShowApiConfig(false)}
             />
