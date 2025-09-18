@@ -166,7 +166,7 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({
             <span className="text-sm text-gray-700">API地址</span>
           </div>
           <span className="text-sm text-gray-600 font-mono truncate max-w-48">
-            {apiService.getBaseURL()}
+            {apiService.getDisplayURL()}
           </span>
         </div>
 

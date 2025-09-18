@@ -253,7 +253,7 @@ const App: React.FC = () => {
               DocuPrism AI v2.0.0 - 基于AI语义理解的文档智能比对系统
             </p>
             <p className="mt-1">
-              API端点: {apiService.getBaseURL()}
+              API端点: {apiService.getDisplayURL()}
             </p>
           </div>
         </div>
