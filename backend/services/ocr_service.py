@@ -24,13 +24,14 @@ logger = logging.getLogger(__name__)
 class OCRService:
     """OCR识别服务"""
     
-    def __init__(self, use_angle_cls=True, lang='ch'):
+    def __init__(self, use_angle_cls=True, lang='ch', use_gpu=None):
         """
         初始化OCR服务
         
         Args:
             use_angle_cls: 是否使用角度分类器
             lang: 语言设置，'ch'为中英文，'en'为英文
+            use_gpu: 是否使用GPU，None为自动检测
         """
         if not HAS_PADDLEOCR:
             raise ImportError("需要安装 PaddleOCR: pip install paddleocr")
@@ -38,11 +39,21 @@ class OCRService:
         logger.info("初始化PaddleOCR...")
         
         try:
-            self.ocr = PaddleOCR(
-                use_angle_cls=use_angle_cls,
-                lang=lang
-                # 移除show_log参数，新版本PaddleOCR不支持
-            )
+            # PaddleOCR 2.8.1 初始化参数
+            ocr_kwargs = {
+                'use_angle_cls': use_angle_cls,
+                'lang': lang,
+                'show_log': False  # 2.8.1版本支持此参数
+            }
+            
+            # 设备配置 - PaddleOCR 2.8.1 使用 use_gpu 参数
+            if use_gpu is True:
+                ocr_kwargs['use_gpu'] = True
+            elif use_gpu is False:
+                ocr_kwargs['use_gpu'] = False
+            # use_gpu=None 时让PaddleOCR自动选择设备
+            
+            self.ocr = PaddleOCR(**ocr_kwargs)
             logger.info("PaddleOCR初始化成功")
         except Exception as e:
             logger.error(f"PaddleOCR初始化失败: {e}")

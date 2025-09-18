@@ -4,6 +4,7 @@
 
 import os
 import logging
+from typing import Optional
 
 
 class Config:
@@ -41,10 +42,16 @@ class Config:
         os.environ["VALIDATION_MAX_WORKERS"] = os.getenv("VALIDATION_MAX_WORKERS", "16")
         os.environ["VALIDATION_USE_GPU"] = os.getenv("VALIDATION_USE_GPU", "true")
         
+        # OCR设备配置
+        os.environ["OCR_USE_GPU"] = os.getenv("OCR_USE_GPU", "auto")
+        os.environ["OCR_GPU_MEMORY_LIMIT"] = os.getenv("OCR_GPU_MEMORY_LIMIT", "500")
+        os.environ["OCR_ENABLE"] = os.getenv("OCR_ENABLE", "false")  # 临时默认禁用OCR
+        
         # LangSmith 配置
         os.environ["LANGSMITH_TRACING"] = "true"
         os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
-        os.environ["LANGSMITH_API_KEY"] = "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"
+        os.environ["LANGSMITH_API_KEY"] = os.getenv("LANGSMITH_API_KEY", "")
+    
         os.environ["LANGSMITH_PROJECT"] = "DocuPrism"
         
         # 调试配置
@@ -137,3 +144,29 @@ class Config:
     def validation_use_gpu(self) -> bool:
         """验证是否使用GPU"""
         return os.environ.get("VALIDATION_USE_GPU", "true").lower() in ("true", "1", "yes", "on")
+    
+    # OCR相关配置属性
+    @property 
+    def ocr_use_gpu(self) -> Optional[bool]:
+        """OCR设备配置"""
+        value = os.environ.get("OCR_USE_GPU", "auto").lower()
+        if value == "true":
+            return True
+        elif value == "false":
+            return False
+        else:
+            return None  # auto自动检测
+    
+    @property
+    def ocr_gpu_memory_limit(self) -> int:
+        """OCR GPU内存限制(MB)"""
+        try:
+            return int(os.environ.get("OCR_GPU_MEMORY_LIMIT", "500"))
+        except (ValueError, TypeError):
+            # 如果无法转换为整数，返回默认值
+            return 500
+    
+    @property
+    def ocr_enable(self) -> bool:
+        """是否启用OCR功能"""
+        return os.environ.get("OCR_ENABLE", "false").lower() in ("true", "1", "yes", "on")

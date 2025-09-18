@@ -7,15 +7,20 @@ PyPDF2>=3.0.0
 # Word文档处理  
 python-docx>=1.0.0
 
-# OCR识别
-paddleocr>=2.7.0
-paddlepaddle>=2.5.0
+# OCR相关 (GPU支持)
+paddleocr==2.8.1
+paddlepaddle-gpu>=2.5.0
+# 注意：PaddleOCR 3.x存在API兼容性问题，推荐使用2.8.1
 
 # 图像处理
 Pillow>=10.0.0
+opencv-python>=4.8.0
 
 # 文件处理
 pathlib2>=2.3.0
+
+# 系统工具
+psutil>=5.9.0  # 系统监控
 
 # 日志和工具
 logging

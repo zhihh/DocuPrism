@@ -21,13 +21,15 @@ logger = get_document_logger('processor')
 class DocumentProcessor:
     """文档预处理器主类"""
     
-    def __init__(self, enable_ocr: bool = True, ocr_lang: str = 'ch'):
+    def __init__(self, enable_ocr: bool = True, ocr_lang: str = 'ch', use_gpu: Optional[bool] = None, gpu_memory_limit: int = 500):
         """
         初始化文档处理器
         
         Args:
             enable_ocr: 是否启用OCR功能
             ocr_lang: OCR语言设置
+            use_gpu: 强制使用GPU(True)/CPU(False)，None为自动检测
+            gpu_memory_limit: GPU内存限制(MB)
         """
         self.pdf_parser = PDFParser()
         self.docx_parser = DOCXParser()
@@ -36,11 +38,21 @@ class DocumentProcessor:
         self.ocr_service = None
         if enable_ocr:
             try:
-                self.ocr_service = OCRService(lang=ocr_lang)
+                self.ocr_service = OCRService(
+                    lang=ocr_lang, 
+                    use_gpu=use_gpu, 
+                    gpu_memory_limit=gpu_memory_limit
+                )
                 self.pdf_parser.set_ocr_service(self.ocr_service)
-                logger.info("OCR服务已启用")
+                
+                # 记录OCR设备信息
+                device_info = self.ocr_service.get_device_info()
+                device_type = "GPU" if device_info['use_gpu'] else "CPU"
+                logger.info(f"✅ OCR服务已启用 - 设备: {device_type}")
+                
             except Exception as e:
-                logger.warning(f"OCR服务初始化失败，将禁用OCR功能: {e}")
+                logger.warning(f"❌ OCR服务初始化失败，将禁用OCR功能: {e}")
+                self.ocr_service = None
     
     def process_file(self, file_path: str, document_id: Optional[str] = None) -> DocumentParseResult:
         """
@@ -292,3 +304,41 @@ class DocumentProcessor:
     def is_ocr_enabled(self) -> bool:
         """检查OCR是否启用"""
         return self.ocr_service is not None and self.ocr_service.is_available()
+    
+    def get_ocr_device_info(self) -> Optional[Dict[str, Any]]:
+        """获取OCR设备信息"""
+        if self.ocr_service:
+            return self.ocr_service.get_device_info()
+        return None
+    
+    def switch_ocr_device(self, use_gpu: bool, gpu_memory_limit: int = 500) -> bool:
+        """
+        切换OCR设备
+        
+        Args:
+            use_gpu: 是否使用GPU
+            gpu_memory_limit: GPU内存限制(MB)
+            
+        Returns:
+            bool: 切换是否成功
+        """
+        if self.ocr_service:
+            success = self.ocr_service.switch_device(use_gpu, gpu_memory_limit)
+            if success:
+                device_type = "GPU" if use_gpu else "CPU"
+                logger.info(f"🔄 OCR设备已切换到: {device_type}")
+            return success
+        return False
+    
+    def get_system_info(self) -> Dict[str, Any]:
+        """获取系统信息"""
+        info = {
+            'ocr_enabled': self.is_ocr_enabled(),
+            'supported_formats': list(self.get_supported_formats().keys()),
+            'ocr_device_info': self.get_ocr_device_info()
+        }
+        
+        if self.ocr_service:
+            info['ocr_performance'] = self.ocr_service.get_performance_info()
+        
+        return info
