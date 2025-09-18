@@ -128,8 +128,8 @@ class ApiService {
       return envApiUrl;
     }
 
-    // 3. 默认值
-    return 'http://localhost:8000';
+    // 3. 默认值 - 使用你的服务器地址
+    return 'http://8.137.111.189:50200';
   }
 
   // 动态更新API地址
