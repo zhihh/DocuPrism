@@ -19,10 +19,10 @@ const ApiConfig: React.FC<ApiConfigProps> = ({
 
   // 预设的常用API地址
   const presetUrls = [
+    'https://docuprism.zhihh.xyz',
     'http://8.137.111.189:50200',
     'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'https://api.docuprism.com'
+    'http://127.0.0.1:8000'
   ];
 
   // 测试连接

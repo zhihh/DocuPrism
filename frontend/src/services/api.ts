@@ -128,8 +128,8 @@ class ApiService {
       return envApiUrl;
     }
 
-    // 3. 默认值 - 使用你的服务器地址
-    return 'http://8.137.111.189:50200';
+    // 3. 默认值 - 使用HTTPS生产服务器
+    return 'https://docuprism.zhihh.xyz';
   }
 
   // 动态更新API地址
