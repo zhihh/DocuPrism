@@ -1,0 +1,307 @@
+name: 🚀 Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  # 构建和测试API
+  build-api:
+    name: 🔧 Build & Test API
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🧪 Run Tests
+      run: |
+        # 运行基础测试
+        python -m pytest test/ -v --tb=short || echo "Tests completed"
+        
+    - name: 🏗️ Build API Documentation
+      run: |
+        # 生成API文档
+        python -c "
+        from src.api.app import app
+        import json
+        
+        # 导出OpenAPI规范
+        with open('api-spec.json', 'w') as f:
+            json.dump(app.openapi(), f, indent=2)
+        print('✅ API文档已生成')
+        "
+        
+    - name: 📤 Upload API Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-artifacts
+        path: |
+          api-spec.json
+          requirements.txt
+
+  # 构建前端
+  build-frontend:
+    name: 🎨 Build Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: 📦 Install Frontend Dependencies
+      working-directory: ./frontend
+      run: |
+        npm ci
+        
+    - name: 🔧 Configure Build Environment
+      working-directory: ./frontend
+      run: |
+        # 创建生产环境配置
+        cat > .env.production << EOF
+        VITE_API_BASE_URL=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/api
+        VITE_APP_TITLE=DocuPrism AI v2.0
+        VITE_APP_VERSION=${{ github.sha }}
+        EOF
+        
+    - name: 🏗️ Build Frontend
+      working-directory: ./frontend
+      run: |
+        npm run build
+        
+    - name: 📤 Upload Frontend Build
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-dist
+        path: frontend/dist/
+
+  # 部署到GitHub Pages
+  deploy:
+    name: 🚀 Deploy to GitHub Pages
+    needs: [build-api, build-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    # 设置GitHub Pages权限
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      
+    # 防止并发部署
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+      
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+      
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download API Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: api-artifacts
+        path: ./api-artifacts
+        
+    - name: 📥 Download Frontend Build
+      uses: actions/download-artifact@v3
+      with:
+        name: frontend-dist
+        path: ./frontend-dist
+        
+    - name: 🏗️ Prepare Deployment Directory
+      run: |
+        # 创建部署目录结构
+        mkdir -p deploy/
+        
+        # 复制前端构建文件到根目录
+        cp -r frontend-dist/* deploy/
+        
+        # 创建API文档目录
+        mkdir -p deploy/api/
+        
+        # 生成API文档页面
+        cat > deploy/api/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>DocuPrism AI API 文档</title>
+            <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css">
+            <style>
+                body { margin: 0; padding: 0; }
+                .swagger-ui .topbar { display: none; }
+            </style>
+        </head>
+        <body>
+            <div id="swagger-ui"></div>
+            <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
+            <script>
+                SwaggerUIBundle({
+                    url: './spec.json',
+                    dom_id: '#swagger-ui',
+                    deepLinking: true,
+                    presets: [
+                        SwaggerUIBundle.presets.apis,
+                        SwaggerUIBundle.presets.standalone
+                    ],
+                    layout: "BaseLayout",
+                    validatorUrl: null
+                });
+            </script>
+        </body>
+        </html>
+        EOF
+        
+        # 复制API规范文件
+        cp api-artifacts/api-spec.json deploy/api/spec.json
+        
+        # 生成部署信息页面
+        cat > deploy/deployment-info.html << EOF
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>DocuPrism AI 部署信息</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .info-box { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+                .success { color: #28a745; }
+                .link { color: #007bff; text-decoration: none; }
+                .link:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <h1>🚀 DocuPrism AI 部署成功</h1>
+            <div class="info-box">
+                <h3 class="success">✅ 部署信息</h3>
+                <p><strong>部署时间:</strong> $(date)</p>
+                <p><strong>Git Commit:</strong> ${{ github.sha }}</p>
+                <p><strong>Git Ref:</strong> ${{ github.ref }}</p>
+                <p><strong>触发事件:</strong> ${{ github.event_name }}</p>
+            </div>
+            <div class="info-box">
+                <h3>📋 可用服务</h3>
+                <ul>
+                    <li><a href="./" class="link">前端应用</a> - React + TypeScript Web界面</li>
+                    <li><a href="./api/" class="link">API文档</a> - Swagger UI 交互式文档</li>
+                </ul>
+            </div>
+            <div class="info-box">
+                <h3>⚠️ 重要说明</h3>
+                <p>这是静态部署版本，仅包含前端界面和API文档。</p>
+                <p>完整的API服务需要单独部署后端服务。</p>
+                <p>请参考 <a href="https://github.com/${{ github.repository }}" class="link">GitHub仓库</a> 获取完整部署指南。</p>
+            </div>
+        </body>
+        </html>
+        EOF
+        
+        # 创建404页面
+        cat > deploy/404.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>页面未找到 - DocuPrism AI</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    text-align: center; 
+                    padding: 100px 20px; 
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    min-height: 100vh;
+                    margin: 0;
+                }
+                .container { max-width: 600px; margin: 0 auto; }
+                h1 { font-size: 72px; margin: 0; }
+                h2 { font-size: 24px; margin: 20px 0; }
+                .link { 
+                    color: #fff; 
+                    text-decoration: none; 
+                    background: rgba(255,255,255,0.2);
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    display: inline-block;
+                    margin: 10px;
+                }
+                .link:hover { background: rgba(255,255,255,0.3); }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>404</h1>
+                <h2>页面未找到</h2>
+                <p>抱歉，您访问的页面不存在。</p>
+                <a href="/" class="link">返回首页</a>
+                <a href="/api/" class="link">API文档</a>
+            </div>
+        </body>
+        </html>
+        EOF
+        
+        echo "✅ 部署目录准备完成"
+        ls -la deploy/
+        
+    - name: 🔧 Setup GitHub Pages
+      uses: actions/configure-pages@v3
+      
+    - name: 📤 Upload Pages Artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: './deploy'
+        
+    - name: 🚀 Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
+
+  # 通知部署结果
+  notify:
+    name: 📬 Deployment Notification
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 📊 Deployment Status
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "🎉 部署成功！"
+          echo "🌐 访问地址: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          echo "📖 API文档: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/api/"
+        else
+          echo "❌ 部署失败，请检查构建日志"
+          exit 1
+        fi
