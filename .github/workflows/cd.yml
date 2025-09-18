@@ -2,9 +2,9 @@ name: 🚀 Continuous Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches: [ deploy ]  # 只在deploy分支触发
   pull_request:
-    branches: [ main ]
+    branches: [ deploy ]
 
 env:
   NODE_VERSION: '18'
