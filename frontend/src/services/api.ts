@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { Document, AnalysisResponse, HealthCheckResponse, FileUpload } from '@/types/api';
+import { Document, AnalysisResponse, HealthCheckResponse } from '@/types/api';
 
 // Backend API相关类型
 export interface SupportedFormatsResponse {

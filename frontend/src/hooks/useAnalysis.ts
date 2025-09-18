@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AnalysisState, DuplicateResult, FileUpload } from '@/types/api';
+import { AnalysisState, FileUpload } from '@/types/api';
 import apiService from '@/services/api';
 import { Document } from '@/types/api';
 

@@ -272,7 +272,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                     </div>
                   )}
                   
-                  {groupOptions.map((option, index) => {
+                  {groupOptions.map((option) => {
                     const isSelected = value.includes(option.value);
                     const globalIndex = filteredOptions.findIndex(opt => opt.value === option.value);
                     const isHighlighted = globalIndex === highlightedIndex;

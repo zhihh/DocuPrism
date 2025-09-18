@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronDown, ChevronUp, Copy, Download, Eye } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { DuplicateResult, CATEGORY_LABELS, CATEGORY_COLORS } from '@/types/api';
 import { copyToClipboard } from '@/utils/helpers';
 

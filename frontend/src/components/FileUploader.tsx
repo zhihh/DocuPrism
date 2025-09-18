@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Upload, FileText, AlertCircle, X, File, Image } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { FileUpload } from '@/types/api';
 import { formatFileSize, validateFileType, parseTextContent, generateUniqueId } from '@/utils/helpers';
-import apiService from '@/services/api';
 
 interface FileUploaderProps {
   files: FileUpload[];

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Settings, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import FileUploader from './components/FileUploader';
 import AnalysisResults from './components/AnalysisResults';
 import ProgressBar from './components/ProgressBar';
 import { useAnalysis } from './hooks/useAnalysis';
-import { FileUpload, Document } from './types/api';
+import { FileUpload } from './types/api';
 import apiService from './services/api';
 import './index.css';
 
