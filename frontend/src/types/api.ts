@@ -45,8 +45,9 @@ export interface FileUpload {
   documentId: number;
   page: number;
   content?: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'uploading';
   error?: string;
+  mode?: 'legacy' | 'backend'; // 处理模式
 }
 
 export interface AnalysisState {

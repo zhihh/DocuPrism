@@ -12,6 +12,10 @@ import multiprocessing
 import uvicorn
 from dotenv import load_dotenv
 
+# 首先初始化统一日志系统
+from src.utils.unified_logger import UnifiedLogger
+UnifiedLogger.setup_logging()
+
 from src.config.config import Config
 
 # 检查 .env 文件是否存在
@@ -23,19 +27,61 @@ config = Config()
 
 from src.api.app import app
 
+# 集成backend文档预处理模块
+try:
+    from backend.integration import integrate_document_processing
+    # 集成文档预处理功能到FastAPI应用
+    enable_ocr = os.environ.get("ENABLE_OCR", "true").lower() == "true"
+    integrate_document_processing(app, enable_ocr=enable_ocr)
+    print("✅ Backend文档预处理模块已集成")
+except ImportError as e:
+    print(f"⚠️ Backend文档预处理模块未启用: {e}")
+    print("请安装相关依赖: pip install -r backend/requirements.txt")
+
 if __name__ == "__main__":
-    # 获取CPU核心数，用于确定工作进程数
-    workers = int(os.environ.get("WORKERS", min(multiprocessing.cpu_count(), 4)))
+    # 根据环境变量决定运行模式
+    workers = int(os.environ.get("WORKERS", 1))
+    env_mode = os.environ.get("ENV_MODE", "development").lower()
     
-    # 生产环境配置
-    uvicorn.run(
-        "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        workers=workers,  # 多工作进程
-        log_level="info", 
-        access_log=True,
-        reload=True,  # 生产环境关闭自动重载
-        loop="uvloop",  # 使用高性能事件循环
-        http="httptools"  # 使用高性能HTTP解析器
-    )
+    # 多进程模式的日志配置
+    if workers > 1:
+        print(f"🚀 启动多进程模式: {workers} 个工作进程")
+        print("📋 多进程日志策略:")
+        print("  - 每个进程独立写入日志文件")
+        print("  - 使用进程ID区分日志来源")
+        print("  - 集中式日志聚合通过外部工具实现")
+        
+        # 生产环境多进程配置
+        uvicorn.run(
+            "main:app", 
+            host="0.0.0.0", 
+            port=8000, 
+            workers=workers,
+            log_level="info", 
+            access_log=True,
+            reload=False,  # 多进程模式禁用重载
+            log_config=None,  # 使用应用自定义日志配置
+            loop="uvloop",
+            http="httptools"
+        )
+    else:
+        print(f"🔧 启动单进程模式 (开发/调试)")
+        print("📋 单进程日志策略:")
+        print("  - 完整的实时日志输出")
+        print("  - 详细的调试信息")
+        print("  - 实时日志监控")
+        
+        # 开发环境单进程配置
+        uvicorn.run(
+            "main:app", 
+            host="0.0.0.0", 
+            port=8000, 
+            workers=1,
+            log_level="info", 
+            access_log=True,
+            reload=(env_mode == "development"),
+            log_config=None,
+            use_colors=True,
+            loop="uvloop",
+            http="httptools"
+        )

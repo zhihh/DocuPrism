@@ -4,7 +4,7 @@
 """
 
 import os
-import logging
+import time
 from typing import List, Tuple, Dict
 from openai import OpenAI
 from langchain_experimental.text_splitter import SemanticChunker
@@ -13,8 +13,9 @@ from langchain.schema import Document
 
 from ..models.api_models import DocumentInput
 from ..models.data_models import TextSegment, DocumentData
+from ..utils.unified_logger import UnifiedLogger
 
-logger = logging.getLogger(__name__)
+logger = UnifiedLogger.get_logger(__name__)
 
 
 class CustomEmbeddings(Embeddings):
@@ -91,11 +92,14 @@ class DocumentProcessor:
     
     def process_json_documents(self, json_data: List[Dict]) -> Tuple[List[DocumentData], List[DocumentInput]]:
         """处理JSON格式的文档数据，返回按doc为单位的数据和原始输入"""
+        start_time = time.time()
+        logger.info(f"📥 开始处理JSON文档数据，输入项目数: {len(json_data)}")
+        
         documents_by_id = {}
         original_inputs = []
         
         # 按文档ID分组，合并同一文档的所有页面
-        for item in json_data:
+        for item_idx, item in enumerate(json_data):
             doc_input = DocumentInput(
                 documentId=item["documentId"],
                 page=item["page"],
@@ -109,9 +113,12 @@ class DocumentProcessor:
                     'pages': {},
                     'content_parts': []
                 }
+                logger.info(f"📄 发现新文档: {doc_id}")
             
             documents_by_id[doc_id]['pages'][doc_input.page] = doc_input.content
             documents_by_id[doc_id]['content_parts'].append(doc_input.content)
+            
+            logger.info(f"📑 处理文档页面: {doc_id} 第{doc_input.page}页, 内容长度: {len(doc_input.content)}字符")
         
         # 创建DocumentData对象
         document_data_list = []
@@ -123,11 +130,19 @@ class DocumentProcessor:
                 pages=data['pages']
             )
             document_data_list.append(doc_data)
+            
+            logger.info(f"📋 合并文档: {doc_id}, 总页数: {len(data['pages'])}, 合并后长度: {len(combined_content)}字符")
+        
+        process_time = time.time() - start_time
+        logger.info(f"✅ JSON文档处理完成，耗时: {process_time:.3f}秒，生成 {len(document_data_list)} 个文档对象")
         
         return document_data_list, original_inputs
     
     def segment_documents(self, document_inputs: List[DocumentInput]) -> List[TextSegment]:
         """基于语义相似性分割文档，支持跨页面的智能分块"""
+        start_time = time.time()
+        logger.info(f"🔍 开始语义分割文档，输入页面数: {len(document_inputs)}")
+        
         all_segments = []
         
         # 按文档ID分组
@@ -137,8 +152,13 @@ class DocumentProcessor:
                 docs_by_id[doc_input.documentId] = []
             docs_by_id[doc_input.documentId].append(doc_input)
         
+        logger.info(f"📊 分组结果: {len(docs_by_id)} 个不同文档")
+        
         # 对每个文档进行语义分割
-        for doc_id, doc_pages in docs_by_id.items():
+        for doc_idx, (doc_id, doc_pages) in enumerate(docs_by_id.items(), 1):
+            doc_start_time = time.time()
+            logger.info(f"📄 处理文档 {doc_idx}/{len(docs_by_id)}: {doc_id}, 页面数: {len(doc_pages)}")
+            
             # 按页码排序
             doc_pages.sort(key=lambda x: x.page)
             
@@ -154,14 +174,21 @@ class DocumentProcessor:
                     page_boundaries.append((start_pos, end_pos, doc_page.page))
                     combined_content += doc_page.content + "\n\n"
                     current_pos = len(combined_content)
+                    logger.info(f"  📑 页面 {doc_page.page}: {len(doc_page.content)} 字符, 位置 {start_pos}-{end_pos}")
             
             if not combined_content.strip():
-                logger.warning(f"文档 {doc_id} 内容为空")
+                logger.warning(f"⚠️ 文档 {doc_id} 内容为空，跳过分割")
                 continue
+            
+            logger.info(f"📝 文档 {doc_id} 合并后总长度: {len(combined_content)} 字符")
             
             # 使用语义分块器进行分割
             try:
+                chunk_start_time = time.time()
                 chunks = self.text_splitter.split_text(combined_content)
+                chunk_time = time.time() - chunk_start_time
+                
+                logger.info(f"🧠 文档 {doc_id} 语义分割完成，耗时: {chunk_time:.2f}秒，生成 {len(chunks)} 个片段")
                 
                 # 转换为TextSegment对象，确定每个片段所属的页面
                 for chunk_id, chunk_content in enumerate(chunks, 1):
@@ -174,6 +201,7 @@ class DocumentProcessor:
                     if chunk_start == -1:
                         # 如果找不到精确匹配，使用第一个页面
                         page_num = doc_pages[0].page
+                        logger.warning(f"⚠️ 片段 {chunk_id} 位置匹配失败，使用第一页")
                     else:
                         # 根据位置确定所属页面（使用片段开始位置所在的页面）
                         page_num = doc_pages[0].page  # 默认值
@@ -193,10 +221,12 @@ class DocumentProcessor:
                     )
                     
                     all_segments.append(segment)
+                    logger.info(f"  ✅ 片段 {chunk_id}: 长度 {len(chunk_content)} 字符, 归属页面 {page_num}")
                     
             except Exception as e:
-                logger.error(f"对文档 {doc_id} 进行语义分割时出错: {e}")
+                logger.error(f"❌ 对文档 {doc_id} 进行语义分割时出错: {e}")
                 # 回退到简单的按句子分割
+                logger.info(f"🔄 文档 {doc_id} 回退到句子分割模式")
                 sentences = combined_content.split('。')
                 for chunk_id, sentence in enumerate(sentences, 1):
                     sentence = sentence.strip()
@@ -210,34 +240,54 @@ class DocumentProcessor:
                             chunk_id=chunk_id
                         )
                         all_segments.append(segment)
+                
+                logger.info(f"📋 文档 {doc_id} 回退分割完成，生成 {len(sentences)} 个句子片段")
+            
+            doc_time = time.time() - doc_start_time
+            logger.info(f"✅ 文档 {doc_id} 处理完成，耗时: {doc_time:.2f}秒")
         
-        logger.info(f"使用语义分块器，共生成 {len(all_segments)} 个文本片段")
+        total_time = time.time() - start_time
+        logger.info(f"🎉 语义分割全部完成，总耗时: {total_time:.2f}秒，共生成 {len(all_segments)} 个文本片段")
         return all_segments
     
     def generate_embeddings(self, segments: List[TextSegment]) -> List[TextSegment]:
         """生成文本嵌入"""
+        start_time = time.time()
+        logger.info(f"🧠 开始生成嵌入向量，输入片段数: {len(segments)}")
+        
         valid_segments = []
         contents = []
         
-        # 也许没有必要
-        for seg in segments:
+        # 验证和准备内容
+        for seg_idx, seg in enumerate(segments):
             if seg.content and isinstance(seg.content, str) and seg.content.strip():
                 valid_segments.append(seg)
                 contents.append(str(seg.content).strip())
+            else:
+                logger.warning(f"⚠️ 跳过无效片段 {seg_idx}: 内容为空或格式错误")
         
         if not contents:
-            logger.error("没有有效的文本内容用于生成嵌入")
+            logger.error("❌ 没有有效的文本内容用于生成嵌入")
             return segments
         
-        logger.info(f"准备为 {len(contents)} 个文本片段生成嵌入...")
+        logger.info(f"📋 有效片段统计: {len(valid_segments)}/{len(segments)}, 模型: {self.embedding_model_name}")
         
         try:
             batch_size = 10
             all_embeddings = []
+            total_batches = (len(contents) + batch_size - 1) // batch_size
             
             for i in range(0, len(contents), batch_size):
+                batch_start_time = time.time()
+                batch_idx = i // batch_size + 1
+                
                 batch_contents = contents[i:i + batch_size]
-                logger.info(f"处理批次 {i//batch_size + 1}/{(len(contents) + batch_size - 1)//batch_size}")
+                logger.info(f"🔄 处理批次 {batch_idx}/{total_batches}, 片段数: {len(batch_contents)}")
+                
+                # 记录批次内容统计
+                batch_lengths = [len(content) for content in batch_contents]
+                avg_length = sum(batch_lengths) / len(batch_lengths)
+                logger.info(f"  📊 批次统计: 平均长度 {avg_length:.0f} 字符, 范围 {min(batch_lengths)}-{max(batch_lengths)}")
                 
                 response = self.client.embeddings.create(
                     model=self.embedding_model_name,
@@ -248,14 +298,31 @@ class DocumentProcessor:
                 
                 batch_embeddings = [item.embedding for item in response.data]
                 all_embeddings.extend(batch_embeddings)
+                
+                batch_time = time.time() - batch_start_time
+                logger.info(f"  ✅ 批次 {batch_idx} 完成，耗时: {batch_time:.2f}秒, 向量维度: {len(batch_embeddings[0])}")
             
+            # 将嵌入向量分配给片段
+            embedding_assign_time = time.time()
             for segment, embedding in zip(valid_segments, all_embeddings):
                 segment.embedding = embedding
+            assign_time = time.time() - embedding_assign_time
                 
-            logger.info(f"成功生成 {len(all_embeddings)} 个嵌入向量")
+            total_time = time.time() - start_time
+            avg_time_per_segment = total_time / len(valid_segments)
+            
+            logger.info(f"🎉 嵌入向量生成完成！")
+            logger.info(f"  📊 统计信息:")
+            logger.info(f"    - 总片段数: {len(valid_segments)}")
+            logger.info(f"    - 总耗时: {total_time:.2f}秒")
+            logger.info(f"    - 平均每片段: {avg_time_per_segment:.3f}秒")
+            logger.info(f"    - 向量分配耗时: {assign_time:.3f}秒")
+            logger.info(f"    - 处理速度: {len(valid_segments)/total_time:.1f} 片段/秒")
             
         except Exception as e:
-            logger.error(f"生成嵌入向量时出错: {e}")
+            error_time = time.time() - start_time
+            logger.error(f"❌ 生成嵌入向量时出错，已耗时: {error_time:.2f}秒")
+            logger.error(f"错误详情: {e}")
             raise e
         
         return segments

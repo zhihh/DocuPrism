@@ -1,4 +1,4 @@
-# BidCheck API 前端使用指南
+# DocuPrism AI 前端使用指南
 
 ## ✅ 升级完成状态
 
@@ -66,7 +66,7 @@ frontend/
 
 ### 1. 启动前端服务器
 ```bash
-cd /home/zhihh/dev/bidcheck-api/frontend
+cd /home/zhihh/dev/DocuPrism/frontend
 npm run dev
 ```
 - 服务地址: http://localhost:3001/
@@ -75,8 +75,8 @@ npm run dev
 
 ### 2. 启动后端API服务器
 ```bash
-cd /home/zhihh/dev/bidcheck-api
-source activate bidcheck
+cd /home/zhihh/dev/DocuPrism
+source activate DocuPrism
 python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 - API地址: http://localhost:8000/

@@ -1,23 +1,45 @@
-import React from 'react';
-import { Upload, FileText, AlertCircle, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, FileText, AlertCircle, X, File, Image } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { FileUpload } from '@/types/api';
 import { formatFileSize, validateFileType, parseTextContent, generateUniqueId } from '@/utils/helpers';
+import apiService from '@/services/api';
 
 interface FileUploaderProps {
   files: FileUpload[];
   onFilesChange: (files: FileUpload[]) => void;
   disabled?: boolean;
   maxFiles?: number;
+  mode?: 'legacy' | 'backend'; // 新增模式选择
 }
 
 const FileUploader: React.FC<FileUploaderProps> = ({
   files,
   onFilesChange,
   disabled = false,
-  maxFiles = 10
+  maxFiles = 10,
+  mode = 'backend' // 默认使用backend模式
 }) => {
-  const allowedTypes = ['.txt', '.md', '.json'];
+  // 根据模式确定支持的文件类型
+  const allowedTypes = mode === 'legacy' 
+    ? ['.txt', '.md', '.json']
+    : ['.txt', '.md', '.json', '.pdf', '.docx', '.png', '.jpg', '.jpeg'];
+
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.toLowerCase().split('.').pop();
+    switch (extension) {
+      case 'pdf':
+        return <File className="h-5 w-5 text-red-500 flex-shrink-0" />;
+      case 'docx':
+        return <File className="h-5 w-5 text-blue-500 flex-shrink-0" />;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+        return <Image className="h-5 w-5 text-green-500 flex-shrink-0" />;
+      default:
+        return <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />;
+    }
+  };
 
   const onDrop = React.useCallback(async (acceptedFiles: File[]) => {
     if (disabled) return;
@@ -29,11 +51,46 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       
       // 验证文件类型
       if (!validateFileType(file, allowedTypes)) {
+        // 为不支持的文件创建错误记录
+        const fileUpload: FileUpload = {
+          id: generateUniqueId(),
+          file,
+          documentId: files.length + newFiles.length + 1,
+          page: 1,
+          status: 'error',
+          error: `不支持的文件格式: ${file.name.split('.').pop()}`,
+          mode
+        };
+        newFiles.push(fileUpload);
         continue;
       }
 
       try {
-        const content = await parseTextContent(file);
+        let content: string | undefined;
+        let status: 'uploading' | 'completed' | 'error' = 'uploading';
+        let error: string | undefined;
+
+        if (mode === 'legacy') {
+          // 传统模式：客户端解析文本文件
+          if (['.txt', '.md', '.json'].some(ext => file.name.toLowerCase().endsWith(ext))) {
+            content = await parseTextContent(file);
+            status = 'completed';
+          } else {
+            status = 'error';
+            error = '传统模式仅支持文本文件';
+          }
+        } else {
+          // Backend模式：支持所有格式，文件将发送到后端处理
+          if (['.txt', '.md', '.json'].some(ext => file.name.toLowerCase().endsWith(ext))) {
+            // 文本文件仍可在前端预览
+            try {
+              content = await parseTextContent(file);
+            } catch {
+              // 如果前端解析失败，后端仍可处理
+            }
+          }
+          status = 'completed'; // 标记为完成，实际处理在分析时进行
+        }
         
         const fileUpload: FileUpload = {
           id: generateUniqueId(),
@@ -41,7 +98,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           documentId: files.length + newFiles.length + 1,
           page: 1,
           content,
-          status: 'completed'
+          status,
+          error,
+          mode
         };
 
         newFiles.push(fileUpload);
@@ -52,7 +111,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           documentId: files.length + newFiles.length + 1,
           page: 1,
           status: 'error',
-          error: '文件读取失败'
+          error: '文件处理失败',
+          mode
         };
 
         newFiles.push(fileUpload);
@@ -60,18 +120,26 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
 
     onFilesChange([...files, ...newFiles]);
-  }, [files, onFilesChange, disabled]);
+  }, [files, onFilesChange, disabled, allowedTypes, mode]);
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
-    accept: {
+    accept: mode === 'legacy' ? {
       'text/plain': ['.txt'],
       'text/markdown': ['.md'],
       'application/json': ['.json']
+    } : {
+      'text/plain': ['.txt'],
+      'text/markdown': ['.md'],
+      'application/json': ['.json'],
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg']
     },
     disabled,
     maxFiles: maxFiles - files.length,
-    maxSize: 10 * 1024 * 1024 // 10MB
+    maxSize: 50 * 1024 * 1024 // 50MB for larger documents
   });
 
   const removeFile = (fileId: string) => {
@@ -120,11 +188,19 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               拖拽文件到此处或点击选择文件
             </p>
             <p className="text-sm text-gray-500">
-              支持 TXT、MD、JSON 格式，最大 10MB
+              {mode === 'legacy' 
+                ? '支持 TXT、MD、JSON 格式，最大 10MB'
+                : '支持 PDF、Word、TXT、MD、JSON、图片格式，最大 50MB'
+              }
             </p>
             <p className="text-xs text-gray-400 mt-1">
               最多可上传 {maxFiles} 个文件，当前已上传 {files.length} 个
             </p>
+            {mode === 'backend' && (
+              <p className="text-xs text-blue-600 mt-2">
+                🚀 支持 PDF/Word 文档和图片 OCR 识别
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -142,7 +218,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg"
               >
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
-                  <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  {getFileIcon(file.file.name)}
                   
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
@@ -151,13 +227,22 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                     <p className="text-xs text-gray-500">
                       {formatFileSize(file.file.size)}
                       {file.content && ` • ${file.content.length} 字符`}
+                      {!file.content && mode === 'backend' && file.status === 'completed' && ' • 待后端处理'}
                     </p>
+                    {file.error && (
+                      <p className="text-xs text-red-500 mt-1">{file.error}</p>
+                    )}
                   </div>
                   
                   <div className="flex-shrink-0">
                     {file.status === 'completed' && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
-                        就绪
+                        {file.content ? '已解析' : '就绪'}
+                      </span>
+                    )}
+                    {file.status === 'uploading' && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        处理中...
                       </span>
                     )}
                     {file.status === 'error' && (

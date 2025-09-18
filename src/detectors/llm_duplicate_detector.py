@@ -6,7 +6,6 @@
 import json
 import os
 import time
-import logging
 from typing import List, Dict, Optional
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -15,8 +14,9 @@ from langchain.schema.runnable import RunnableLambda, RunnableParallel
 from ..models.api_models import DuplicateOutput
 from ..models.data_models import TextSegment, DocumentData
 from ..utils.text_utils import extract_prefix_suffix
+from ..utils.unified_logger import UnifiedLogger
 
-logger = logging.getLogger(__name__)
+logger = UnifiedLogger.get_logger(__name__)
 
 
 class LLMDuplicateDetector:

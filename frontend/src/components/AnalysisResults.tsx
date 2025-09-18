@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, FileText, AlertTriangle, Copy, Download } from 'lucide-react';
+import { FileText, AlertTriangle, Copy, Download } from 'lucide-react';
 import { DuplicateResult, CATEGORY_LABELS, CATEGORY_COLORS } from '@/types/api';
 import { formatDuration, copyToClipboard, downloadAsFile } from '@/utils/helpers';
 
@@ -45,7 +45,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     };
 
     const json = JSON.stringify(exportData, null, 2);
-    downloadAsFile(json, `bidcheck-results-${Date.now()}.json`, 'application/json');
+    downloadAsFile(json, `docuprism-results-${Date.now()}.json`, 'application/json');
     
     if (onExport) {
       onExport();
