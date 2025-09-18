@@ -2,9 +2,9 @@ name: 🚀 Continuous Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches: [ deploy ]  # 只在deploy分支触发
   pull_request:
-    branches: [ main ]
+    branches: [ deploy ]
 
 env:
   NODE_VERSION: '18'
@@ -139,7 +139,7 @@ jobs:
     name: 🚀 Deploy to GitHub Pages
     needs: [build-api, build-frontend]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/deploy'  # 只在deploy分支部署
     
     # 设置GitHub Pages权限
     permissions:
