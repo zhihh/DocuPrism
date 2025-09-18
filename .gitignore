@@ -1,24 +1,43 @@
+# Python缓存文件
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.mypy_cache/
+
+# 开发环境文件
 .github/
 .vscode/
-/config/
+.env
+.env.local
+
+# 日志文件
+/logs/*
+*.log
+
+# 数据文件
 /data/*
-/.mypy_cache/
-/notebook/
-/scripts/*
+!data/input.json
+!data/body.txt
+
+# 临时和配置文件
+/config/
 /ssl/
 /test/
-/requirements.in
-/.env
-/requirements.txt.bak
-/docker-compose.yml.bak
-/logs/*
+/notebook/
+requirements.txt.bak
+docker-compose.yml.bak
 /docker-compose.yml
 /SoftwareCopyrightApplication/
 
+# 脚本文件（保留核心脚本）
+/scripts/*
+!scripts/aggregate_logs.py
 
-!scripts/test_localfile.py
-!data/input.json
-!data/body.txt
+# 测试文件
+test_*.txt
+test_*.pdf
+test_*.docx
+nohup.out
 
 

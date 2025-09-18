@@ -24,7 +24,7 @@ loglevel = "info"
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
 # 进程名称
-proc_name = "bidcheck-api"
+proc_name = "docuprism-ai"
 
 # 重启配置
 preload_app = True

@@ -4,7 +4,6 @@
 专门优化两两查重任务的性能
 """
 
-import logging
 import os
 import time
 import numpy as np
@@ -12,8 +11,9 @@ from typing import List, Dict, Tuple, Optional
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ..models.data_models import TextSegment
+from ..utils.unified_logger import UnifiedLogger
 
-logger = logging.getLogger(__name__)
+logger = UnifiedLogger.get_logger(__name__)
 
 # 动态导入dashscope以避免依赖问题
 try:

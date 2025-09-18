@@ -33,6 +33,10 @@ logs/
 test/
 *_test.py
 test_*.py
+test_*.txt
+test_*.pdf
+test_*.docx
+nohup.out
 
 # Jupyter notebooks
 notebook/
@@ -43,5 +47,10 @@ Dockerfile*
 docker-compose*.yml
 .dockerignore
 
-# Scripts (因为我们不需要额外脚本)
+# Development scripts (保留聚合脚本)
 scripts/
+!scripts/aggregate_logs.py
+
+# Temporary files
+/config/
+/SoftwareCopyrightApplication/

@@ -5,9 +5,9 @@
 支持GPU加速和多线程处理
 """
 
-import logging
 import os
 import re
+import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Tuple, Optional
@@ -31,8 +31,9 @@ from ..models.api_models import DuplicateOutput
 from ..models.data_models import DocumentData
 from ..utils.text_utils import extract_prefix_suffix
 from ..config.config import Config
+from ..utils.unified_logger import UnifiedLogger
 
-logger = logging.getLogger(__name__)
+logger = UnifiedLogger.get_logger(__name__)
 
 
 class ValidationManager:
@@ -382,17 +383,23 @@ class ValidationManager:
         使用优化算法验证检测结果
         集成Boyer-Moore精确查找、Levenshtein编辑距离、向量相似度验证
         """
+        start_time = time.time()
+        
         if not detected_results:
+            logger.info("📄 无检测结果需要验证")
             return detected_results
         
-        logger.info(f"🔍 开始优化验证检测结果（共 {len(detected_results)} 对）...")
+        logger.info(f"🔍 开始优化验证检测结果，共 {len(detected_results)} 对")
+        logger.info(f"📊 验证配置: 相似度阈值={self.similarity_threshold}, 向量阈值={self.vector_threshold}")
         
         # 创建文档内容查找字典
         doc_dict = {doc.document_id: doc.content for doc in document_data_list}
+        logger.info(f"📋 文档索引: {len(doc_dict)} 个文档可用于验证")
         
         # 准备批量验证数据
+        prep_start_time = time.time()
         validation_data = []
-        for result in detected_results:
+        for result_idx, result in enumerate(detected_results):
             doc1_content = doc_dict.get(result.documentId1, "")
             doc2_content = doc_dict.get(result.documentId2, "")
             
@@ -400,14 +407,24 @@ class ValidationManager:
                 validation_data.append({
                     'result': result,
                     'doc1_content': doc1_content,
-                    'doc2_content': doc2_content
+                    'doc2_content': doc2_content,
+                    'index': result_idx
                 })
+            else:
+                logger.warning(f"⚠️ 结果 {result_idx}: 文档内容缺失 (doc1: {bool(doc1_content)}, doc2: {bool(doc2_content)})")
+        
+        prep_time = time.time() - prep_start_time
         
         if not validation_data:
-            logger.warning("没有找到有效的文档内容")
+            logger.warning("❌ 没有找到有效的文档内容可供验证")
             return []
         
+        logger.info(f"✅ 数据准备完成，耗时: {prep_time:.3f}秒，有效验证对象: {len(validation_data)}/{len(detected_results)}")
+        
         # 并行验证处理
+        validation_start_time = time.time()
+        logger.info(f"🚀 开始并行验证，线程数: {self.max_workers}")
+        
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
                 executor.submit(self._validate_single_result, data)
@@ -415,12 +432,35 @@ class ValidationManager:
             ]
             
             validated_results = []
+            completed_count = 0
+            
             for future in as_completed(futures):
+                completed_count += 1
                 result = future.result()
                 if result:
                     validated_results.append(result)
+                
+                # 每完成10个任务或达到总数时记录进度
+                if completed_count % 10 == 0 or completed_count == len(futures):
+                    progress = (completed_count / len(futures)) * 100
+                    logger.info(f"🔄 验证进度: {completed_count}/{len(futures)} ({progress:.1f}%), 通过: {len(validated_results)}")
         
-        logger.info(f"✅ 优化验证完成，保留 {len(validated_results)}/{len(detected_results)} 对重复内容")
+        validation_time = time.time() - validation_start_time
+        total_time = time.time() - start_time
+        
+        pass_rate = (len(validated_results) / len(detected_results)) * 100
+        avg_time_per_result = validation_time / len(validation_data)
+        
+        logger.info(f"🎉 验证完成！")
+        logger.info(f"  📊 验证统计:")
+        logger.info(f"    - 输入结果: {len(detected_results)} 对")
+        logger.info(f"    - 有效验证: {len(validation_data)} 对")
+        logger.info(f"    - 通过验证: {len(validated_results)} 对")
+        logger.info(f"    - 通过率: {pass_rate:.1f}%")
+        logger.info(f"    - 验证耗时: {validation_time:.2f}秒")
+        logger.info(f"    - 总耗时: {total_time:.2f}秒")
+        logger.info(f"    - 平均每对: {avg_time_per_result:.3f}秒")
+        
         return validated_results
     
     def _validate_single_result(self, data: Dict[str, Any]) -> Optional[DuplicateOutput]:

@@ -20,7 +20,7 @@ const App: React.FC = () => {
     error: analysisError,
     totalCount,
     processingTime,
-    analyzeDocuments,
+    analyzeFiles,
     resetAnalysis,
   } = useAnalysis();
 
@@ -42,21 +42,15 @@ const App: React.FC = () => {
 
   // 开始分析
   const handleAnalyze = async () => {
-    const validFiles = files.filter(f => f.status === 'completed' && f.content);
+    const validFiles = files.filter(f => f.status === 'completed');
     
     if (validFiles.length < 2) {
       alert('至少需要2个有效文档才能进行分析');
       return;
     }
 
-    const documents: Document[] = validFiles.map(file => ({
-      documentId: file.documentId,
-      page: file.page,
-      content: file.content!
-    }));
-
     try {
-      await analyzeDocuments(documents);
+      await analyzeFiles(validFiles);
     } catch (error) {
       console.error('分析失败:', error);
     }
@@ -69,7 +63,7 @@ const App: React.FC = () => {
   };
 
   const getValidFileCount = () => {
-    return files.filter(f => f.status === 'completed' && f.content).length;
+    return files.filter(f => f.status === 'completed').length;
   };
 
   const canAnalyze = () => {
@@ -86,10 +80,10 @@ const App: React.FC = () => {
               <Search className="h-8 w-8 text-primary-600 mr-3" />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  BidCheck API
+                  DocuPrism AI
                 </h1>
                 <p className="text-sm text-gray-500">
-                  智能文档查重系统
+                  AI语义文档比对系统
                 </p>
               </div>
             </div>
@@ -153,7 +147,7 @@ const App: React.FC = () => {
                 文档上传
               </h2>
               <p className="text-sm text-gray-600 mt-1">
-                上传需要检测的文档文件，支持 TXT、MD、JSON 格式
+                上传需要检测的文档文件，支持 PDF、Word、TXT、MD、JSON、图片格式
               </p>
             </div>
             
@@ -163,6 +157,7 @@ const App: React.FC = () => {
                 onFilesChange={setFiles}
                 disabled={isAnalyzing || !isConnected}
                 maxFiles={10}
+                mode="backend"
               />
             </div>
           </div>
@@ -255,7 +250,7 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-sm text-gray-500">
             <p>
-              BidCheck API v1.0.0 - 基于深度学习和大模型的智能文档查重系统
+              DocuPrism AI v2.0.0 - 基于AI语义理解的文档智能比对系统
             </p>
             <p className="mt-1">
               API端点: {apiService.getBaseURL()}

@@ -15,8 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from ..models.api_models import DocumentInput, ApiResponse
 from .service import DocumentDeduplicationService
 from ..config.config import Config
+from ..utils.unified_logger import UnifiedLogger
 
-logger = logging.getLogger(__name__)
+logger = UnifiedLogger.get_logger(__name__)
 
 # 创建配置实例
 config = Config()
@@ -173,6 +174,10 @@ async def analyze_documents(request: Request, documents: List[DocumentInput]):
     """
     start_time = datetime.now()
     
+    # API调用开始日志
+    logger.info("🔥 API /api/v2/analyze 被调用")
+    logger.info("⚡ 开始处理文档重复内容分析请求")
+    
     # 获取原始请求体用于调试（可通过环境变量控制）
     if config.debug_request_body:
         try:
@@ -200,7 +205,7 @@ async def analyze_documents(request: Request, documents: List[DocumentInput]):
             logger.warning("⚠️ 输入文档为空")
             raise HTTPException(status_code=400, detail="输入文档不能为空")
         
-        logger.info(f"✅ 输入验证通过，文档数量: {len(documents)}")
+        logger.info(f"🔍 输入验证通过，文档数量: {len(documents)}")
         
         # 转换为字典格式
         json_input = [
@@ -212,15 +217,17 @@ async def analyze_documents(request: Request, documents: List[DocumentInput]):
             for doc in documents
         ]
         
-        logger.info(f"🔄 转换为内部格式完成")
+        logger.info(f"🔄 转换为内部格式完成，准备调用service")
         
         # 执行异步分析
+        logger.info(f"🚀 开始调用 deduplication_service.analyze_documents")
         duplicate_results = await deduplication_service.analyze_documents(json_input)
+        logger.info(f"✅ service调用完成，返回结果数量: {len(duplicate_results) if duplicate_results else 0}")
         
         # 计算处理时间
         processing_time = (datetime.now() - start_time).total_seconds()
         
-        logger.info(f"✅ 分析完成，发现 {len(duplicate_results)} 对重复内容，耗时 {processing_time:.2f}秒")
+        logger.info(f"📊 分析完成，发现 {len(duplicate_results)} 对重复内容，耗时 {processing_time:.2f}秒")
         
         return ApiResponse(
             success=True,
@@ -245,6 +252,20 @@ async def analyze_documents(request: Request, documents: List[DocumentInput]):
             total_count=0,
             processing_time=processing_time
         )
+
+
+@app.get("/api/v2/test-logger")
+async def test_logger():
+    """测试日志系统是否正常工作"""
+    logger.info("🧪 测试端点被调用 - 统一日志系统测试")
+    logger.warning("⚠️ 这是一个测试WARNING日志")
+    logger.error("❌ 这是一个测试ERROR日志")
+    
+    # 强制写入日志
+    import logging
+    logging.getLogger().handlers[1].flush()  # 强制刷新文件处理器
+    
+    return {"message": "日志测试完成，请检查logs/main.log"}
 
 
 @app.post("/api/v2/debug/toggle")

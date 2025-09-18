@@ -1,0 +1,24 @@
+# Backend文档预处理模块依赖包
+
+# PDF处理
+pdfplumber>=0.10.0
+PyPDF2>=3.0.0
+
+# Word文档处理  
+python-docx>=1.0.0
+
+# OCR识别
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0
+
+# 图像处理
+Pillow>=10.0.0
+
+# 文件处理
+pathlib2>=2.3.0
+
+# 日志和工具
+logging
+uuid
+tempfile
+pathlib
