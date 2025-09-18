@@ -57,7 +57,8 @@ class ApiService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    // 从环境变量或localStorage获取API地址
+    this.baseURL = this.getApiBaseUrl();
     
     this.api = axios.create({
       baseURL: this.baseURL,
@@ -112,6 +113,35 @@ class ApiService {
         }
       }
     );
+  }
+
+  private getApiBaseUrl(): string {
+    // 1. 检查localStorage中的配置
+    const storedApiUrl = localStorage.getItem('apiBaseUrl');
+    if (storedApiUrl && storedApiUrl !== 'default') {
+      return storedApiUrl;
+    }
+
+    // 2. 检查环境变量
+    const envApiUrl = import.meta.env.VITE_API_BASE_URL;
+    if (envApiUrl) {
+      return envApiUrl;
+    }
+
+    // 3. 默认值
+    return 'http://localhost:8000';
+  }
+
+  // 动态更新API地址
+  updateBaseURL(newBaseURL: string) {
+    this.baseURL = newBaseURL;
+    this.api.defaults.baseURL = newBaseURL;
+    localStorage.setItem('apiBaseUrl', newBaseURL);
+    console.log(`API地址已更新为: ${newBaseURL}`);
+  }
+
+  getBaseURL(): string {
+    return this.baseURL;
   }
 
   /**
@@ -298,13 +328,6 @@ class ApiService {
       total_count: backendData.total_count || convertedData.length,
       processing_time: backendData.processing_time || 0
     };
-  }
-
-  /**
-   * 获取当前API基础URL
-   */
-  getBaseURL(): string {
-    return this.baseURL;
   }
 
   /**

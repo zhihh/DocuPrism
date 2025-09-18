@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, RefreshCw, Settings } from 'lucide-react';
 import FileUploader from './components/FileUploader';
 import AnalysisResults from './components/AnalysisResults';
 import ProgressBar from './components/ProgressBar';
+import ApiConfig from './components/ApiConfig';
 import { useAnalysis } from './hooks/useAnalysis';
 import { FileUpload } from './types/api';
 import apiService from './services/api';
@@ -12,6 +13,7 @@ const App: React.FC = () => {
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [apiStatus, setApiStatus] = useState<string>('');
+  const [showApiConfig, setShowApiConfig] = useState<boolean>(false);
   
   const {
     isAnalyzing,
@@ -39,6 +41,12 @@ const App: React.FC = () => {
   useEffect(() => {
     checkConnection();
   }, []);
+
+  // 处理API配置变更
+  const handleApiConfigChange = (newUrl: string) => {
+    apiService.updateBaseURL(newUrl);
+    checkConnection(); // 重新检查连接
+  };
 
   // 开始分析
   const handleAnalyze = async () => {
@@ -108,6 +116,15 @@ const App: React.FC = () => {
                 </span>
               </div>
               
+              {/* API配置按钮 */}
+              <button
+                onClick={() => setShowApiConfig(!showApiConfig)}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                title="API配置"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              
               <button
                 onClick={checkConnection}
                 className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -123,6 +140,15 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
+          {/* API配置 */}
+          {showApiConfig && (
+            <ApiConfig
+              currentUrl={apiService.getBaseURL()}
+              onUrlChange={handleApiConfigChange}
+              onClose={() => setShowApiConfig(false)}
+            />
+          )}
+
           {/* API状态警告 */}
           {!isConnected && (
             <div className="bg-error-50 border border-error-200 rounded-lg p-4">
